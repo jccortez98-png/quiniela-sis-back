@@ -48,6 +48,20 @@ export class MatchesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
+  @Patch(':id/jackpot-fee')
+  async updateJackpotFee(@Param('id') id: string, @Body('fee') fee: number) {
+    return this.matchesService.updateJackpotFee(id, fee);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get(':id/jackpot-winners')
+  async getJackpotWinners(@Param('id') id: string) {
+    return this.matchesService.getJackpotWinners(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.matchesService.delete(id);

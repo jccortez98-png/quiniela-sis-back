@@ -44,6 +44,12 @@ export class Match {
   @Prop({ default: 0 })
   jackpotPot: number;
 
+  @Prop({ default: 10 })
+  jackpotFee: number;
+
+  @Prop({ required: true, enum: ['open', 'paid_out', 'rolled_over'], default: 'open' })
+  jackpotStatus: string;
+
   @Prop({ type: String, default: null, index: true })
   externalId: string | null;
 }

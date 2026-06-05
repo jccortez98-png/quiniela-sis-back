@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type UserDocument = User & Document;
 
@@ -28,6 +28,15 @@ export class User {
 
   @Prop({ default: 0 })
   totalPoints: number;
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Team' }], default: [] })
+  favoriteTeams: Types.ObjectId[];
+
+  @Prop({ required: true, enum: ['male', 'female', 'other'] })
+  gender: string;
+
+  @Prop({ required: true, min: 1 })
+  age: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { MatchesModule } from './matches/matches.module';
 import { PredictionsModule } from './predictions/predictions.module';
 import { JackpotRequestsModule } from './jackpot-requests/jackpot-requests.module';
+import { TeamsModule } from './teams/teams.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { JackpotRequestsModule } from './jackpot-requests/jackpot-requests.modul
     MatchesModule,
     PredictionsModule,
     JackpotRequestsModule,
+    TeamsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

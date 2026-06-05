@@ -6,6 +6,7 @@ import { Match, MatchSchema } from './schemas/match.schema';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { PredictionsModule } from '../predictions/predictions.module';
+import { JackpotRequestsModule } from '../jackpot-requests/jackpot-requests.module';
 import { ExternalApiService } from './external-api.service';
 
 @Module({
@@ -14,6 +15,7 @@ import { ExternalApiService } from './external-api.service';
     forwardRef(() => AuthModule),
     forwardRef(() => UsersModule),
     forwardRef(() => PredictionsModule),
+    forwardRef(() => JackpotRequestsModule),
   ],
   controllers: [MatchesController],
   providers: [MatchesService, ExternalApiService],

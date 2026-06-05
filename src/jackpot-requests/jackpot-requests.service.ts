@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { JackpotRequest, JackpotRequestDocument } from './schemas/jackpot-request.schema';
@@ -20,7 +20,7 @@ export class JackpotRequestsService {
     }
 
     const now = new Date();
-    const lockTime = new Date(match.date.getTime() - 5 * 60 * 1000);
+    const lockTime = new Date(match.date.getTime() - 10 * 60 * 1000);
     if (now >= lockTime) {
       throw new ConflictException('El registro al jackpot está bloqueado para este partido');
     }
@@ -42,6 +42,13 @@ export class JackpotRequestsService {
     });
 
     return newRequest.save();
+  }
+
+  async findApprovedByMatch(matchId: string): Promise<JackpotRequestDocument[]> {
+    return this.jackpotRequestModel.find({
+      matchId: new Types.ObjectId(matchId),
+      status: 'approved',
+    }).exec();
   }
 
   async findByUserAndMatch(userId: string, matchId: string): Promise<JackpotRequestDocument | null> {
@@ -82,10 +89,10 @@ export class JackpotRequestsService {
     request.status = 'approved';
     const savedRequest = await request.save();
 
-    // Increment jackpotPot in Match. Default cuota is Q10.
-    // In Step 3, we can increment by the match's specific cuota if dynamic,
-    // but the default is Q10.
-    await this.matchesService.incrementJackpotPot(request.matchId.toString(), 10);
+    // Increment jackpotPot in Match. Use the match's specific jackpotFee.
+    const match = await this.matchesService.findById(request.matchId.toString());
+    const fee = match ? (match.jackpotFee ?? 10) : 10;
+    await this.matchesService.incrementJackpotPot(request.matchId.toString(), fee);
 
     return savedRequest;
   }
@@ -98,5 +105,85 @@ export class JackpotRequestsService {
 
     request.status = 'rejected';
     return request.save();
+  }
+
+  async rolloverJackpot(fromMatchId: string, toMatchId: string): Promise<any> {
+    const fromMatch = await this.matchesService.findById(fromMatchId);
+    const toMatch = await this.matchesService.findById(toMatchId);
+
+    if (!fromMatch || !toMatch) {
+      throw new NotFoundException('Uno o ambos partidos no existen');
+    }
+
+    if (fromMatch.status !== 'finished') {
+      throw new BadRequestException('El partido de origen debe estar finalizado');
+    }
+
+    if (toMatch.status !== 'pending') {
+      throw new BadRequestException('El partido destino debe estar próximo (pendiente)');
+    }
+
+    if (fromMatch.jackpotStatus !== 'open') {
+      throw new BadRequestException('El jackpot de este partido ya ha sido procesado');
+    }
+
+    // 1. Get all approved requests for fromMatch
+    const approvedRequests = await this.jackpotRequestModel.find({
+      matchId: fromMatch._id,
+      status: 'approved',
+    }).exec();
+
+    // 2. Transfer pot
+    const rolloverAmount = fromMatch.jackpotPot || 0;
+    await this.matchesService.incrementJackpotPot(toMatchId, rolloverAmount);
+
+    // Reset fromMatch pot to 0 and set jackpotStatus to 'rolled_over'
+    await this.matchesService.update(fromMatchId, {
+      jackpotPot: 0,
+      jackpotStatus: 'rolled_over',
+    });
+
+    // 3. Register users automatically in toMatch for free
+    for (const req of approvedRequests) {
+      const existing = await this.jackpotRequestModel.findOne({
+        userId: req.userId,
+        matchId: toMatch._id,
+      }).exec();
+
+      if (!existing) {
+        const newReq = new this.jackpotRequestModel({
+          userId: req.userId,
+          matchId: toMatch._id,
+          status: 'approved',
+        });
+        await newReq.save();
+      } else if (existing.status !== 'approved') {
+        existing.status = 'approved';
+        await existing.save();
+      }
+    }
+
+    return { success: true, rolledOverAmount: rolloverAmount, usersTransferred: approvedRequests.length };
+  }
+
+  async payoutJackpot(matchId: string): Promise<any> {
+    const match = await this.matchesService.findById(matchId);
+    if (!match) {
+      throw new NotFoundException('Partido no encontrado');
+    }
+
+    if (match.status !== 'finished') {
+      throw new BadRequestException('El partido debe estar finalizado');
+    }
+
+    if (match.jackpotStatus !== 'open') {
+      throw new BadRequestException('El jackpot de este partido ya ha sido procesado');
+    }
+
+    await this.matchesService.update(matchId, {
+      jackpotStatus: 'paid_out',
+    });
+
+    return { success: true, status: 'paid_out' };
   }
 }

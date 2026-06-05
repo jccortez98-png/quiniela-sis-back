@@ -1,7 +1,27 @@
+const { MongoClient, ObjectId } = require('mongodb');
 const API_URL = 'http://localhost:3000';
 
 async function runTests() {
   console.log('🚀 Iniciando pruebas de flujo Quiniela...\n');
+
+  // Setup DB client and get 2 favorite teams
+  const client = new MongoClient('mongodb://127.0.0.1:27017');
+  await client.connect();
+  const db = client.db('quiniela');
+
+  // Ensure 2 teams exist
+  let teams = await db.collection('teams').find().limit(2).toArray();
+  if (teams.length < 2) {
+    console.log('📝 Creando selecciones de prueba en MongoDB...');
+    const dummyTeams = [
+      { name: 'Guatemala Test', flag: '🇬🇹' },
+      { name: 'Argentina Test', flag: '🇦🇷' }
+    ];
+    await db.collection('teams').insertMany(dummyTeams);
+    teams = await db.collection('teams').find().limit(2).toArray();
+  }
+  const favoriteTeams = teams.map(t => t._id.toString());
+  console.log(`✅ Selecciones favoritas para registro: [${teams.map(t => t.name).join(', ')}]`);
 
   // Generate unique nicknames and emails so tests can run repeatedly
   const timestamp = Date.now();
@@ -43,6 +63,9 @@ async function runTests() {
     password: 'password123',
     realName: 'Jose Test',
     nickname: userNickname,
+    favoriteTeams: favoriteTeams,
+    gender: 'male',
+    age: 25,
   });
   if (regUser.status === 201 && regUser.data.access_token) {
     userToken = regUser.data.access_token;
@@ -50,6 +73,7 @@ async function runTests() {
     console.log(`✅ Usuario registrado. ID: ${userId}, Nickname: ${userNickname}`);
   } else {
     console.error('❌ Registro de usuario fallido:', regUser.data);
+    await client.close();
     return;
   }
 
@@ -60,29 +84,24 @@ async function runTests() {
     password: 'password123',
     realName: 'Jose Admin',
     nickname: adminNickname,
+    favoriteTeams: favoriteTeams,
+    gender: 'female',
+    age: 30,
   });
   if (regAdmin.status === 201 && regAdmin.data.access_token) {
     adminToken = regAdmin.data.access_token;
     adminId = regAdmin.data.user.id;
     console.log(`✅ Admin registrado. ID: ${adminId}, Nickname: ${adminNickname}`);
 
-    // Since register defaults to user role, we need to promote this user to admin directly in MongoDB
-    // Wait, let's connect to the db and update their role, or let's create a quick way to make them admin.
-    // For testing, let's write a small script later or do it via mongoose. Since we can run a shell command or
-    // we can update it in MongoDB using the mongo CLI or node script. Let's do it via node script.
     console.log('🔑 Promoviendo usuario a admin en MongoDB...');
-    const { MongoClient, ObjectId } = require('mongodb');
-    const client = new MongoClient('mongodb://127.0.0.1:27017');
-    await client.connect();
-    const db = client.db('quiniela');
     await db.collection('users').updateOne(
       { _id: new ObjectId(adminId) },
       { $set: { role: 'admin' } }
     );
-    await client.close();
     console.log('✅ Admin promovido en base de datos.');
   } else {
     console.error('❌ Registro de admin fallido:', regAdmin.data);
+    await client.close();
     return;
   }
 
@@ -132,7 +151,7 @@ async function runTests() {
     predictedScore: { home: 2, away: 1 }
   }, userToken);
   if (predictSoon.status === 400) {
-    console.log('✅ Bloqueo de 5 minutos funciona! Error retornado:', predictSoon.data.message);
+    console.log('✅ Bloqueo de 10 minutos funciona! Error retornado:', predictSoon.data.message);
   } else {
     console.error('❌ ERROR: Se permitió predicción en partido bloqueado. Status:', predictSoon.status, predictSoon.data);
   }
@@ -193,10 +212,6 @@ async function runTests() {
   console.log('\n9. Admin inscribe al usuario en la Quiniela General...');
   // Note: we'll implement toggleGeneralEnrollment in the admin module in Step 3.
   // For Step 2 verification, let's update MongoDB directly to toggle general enrollment.
-  const { MongoClient, ObjectId } = require('mongodb');
-  const client = new MongoClient('mongodb://127.0.0.1:27017');
-  await client.connect();
-  const db = client.db('quiniela');
   await db.collection('users').updateOne(
     { _id: new ObjectId(userId) },
     { $set: { isEnrolledGeneral: true } }
@@ -248,9 +263,18 @@ async function runTests() {
   const myPredictions = await apiCall('/predictions/me', 'GET', null, userToken);
   if (myPredictions.status === 200) {
     console.log(`✅ Predicciones recuperadas: ${myPredictions.data.length} registros.`);
+    let autoZeroZeroFound = false;
     myPredictions.data.forEach(p => {
-      console.log(`   - Tipo: ${p.type}, Predicción: ${p.predictedScore.home}-${p.predictedScore.away}`);
+      console.log(`   - Tipo: ${p.type}, Predicción: ${p.predictedScore.home}-${p.predictedScore.away}, Partido: ${p.matchId}`);
+      if (p.matchId === matchIdSoon && p.type === 'general' && p.predictedScore.home === 0 && p.predictedScore.away === 0) {
+        autoZeroZeroFound = true;
+      }
     });
+    if (autoZeroZeroFound) {
+      console.log('✅ Verificación de autocreación de predicción 0-0 exitosa!');
+    } else {
+      console.error('❌ ERROR: No se encontró la predicción autocreada 0-0 para el partido bloqueado.');
+    }
   } else {
     console.error('❌ Fallo al recuperar predicciones:', myPredictions.data);
   }

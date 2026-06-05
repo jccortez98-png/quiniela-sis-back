@@ -50,4 +50,21 @@ export class JackpotRequestsController {
   async reject(@Param('id') id: string) {
     return this.jackpotRequestsService.rejectRequest(id);
   }
+
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Post('rollover')
+  async rollover(
+    @Body('fromMatchId') fromMatchId: string,
+    @Body('toMatchId') toMatchId: string,
+  ) {
+    return this.jackpotRequestsService.rolloverJackpot(fromMatchId, toMatchId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @Post(':matchId/payout')
+  async payout(@Param('matchId') matchId: string) {
+    return this.jackpotRequestsService.payoutJackpot(matchId);
+  }
 }

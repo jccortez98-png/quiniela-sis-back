@@ -34,6 +34,9 @@ export class AuthService {
         role: user.role,
         isEnrolledGeneral: user.isEnrolledGeneral,
         totalPoints: user.totalPoints,
+        favoriteTeams: user.favoriteTeams,
+        gender: user.gender,
+        age: user.age,
       },
     };
   }

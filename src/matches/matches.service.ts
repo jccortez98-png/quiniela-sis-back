@@ -213,4 +213,24 @@ export class MatchesService {
 
     return savedMatch;
   }
+
+  async updateJackpotFee(id: string, fee: number): Promise<MatchDocument> {
+    const updated = await this.matchModel.findByIdAndUpdate(
+      id,
+      { $set: { jackpotFee: fee } },
+      { new: true },
+    ).exec();
+    if (!updated) {
+      throw new NotFoundException('Partido no encontrado');
+    }
+    return updated;
+  }
+
+  async getJackpotWinners(matchId: string): Promise<any[]> {
+    const match = await this.findById(matchId);
+    if (!match || !match.actualScore) {
+      return [];
+    }
+    return this.predictionsService.findJackpotWinners(matchId, match.actualScore);
+  }
 }
