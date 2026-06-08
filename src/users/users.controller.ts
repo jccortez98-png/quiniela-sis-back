@@ -72,4 +72,14 @@ export class UsersController {
   ) {
     return this.usersService.updateProfile(userId, updateDto);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Patch(':id/reset-password')
+  async resetPassword(
+    @Param('id') id: string,
+    @Body('password') password: string,
+  ) {
+    return this.usersService.resetPassword(id, password);
+  }
 }

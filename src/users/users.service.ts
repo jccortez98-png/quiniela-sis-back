@@ -152,6 +152,24 @@ export class UsersService {
     return updated;
   }
 
+  async resetPassword(userId: string, newPassword: string): Promise<UserDocument> {
+    if (!newPassword || newPassword.length < 6) {
+      throw new BadRequestException('La contraseña debe tener al menos 6 caracteres');
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const updated = await this.userModel.findByIdAndUpdate(
+      userId,
+      { $set: { password: hashedPassword } },
+      { new: true },
+    ).select('-password').exec();
+
+    if (!updated) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    return updated;
+  }
+
   async findAll(): Promise<UserDocument[]> {
     return this.userModel.find().select('-password').exec();
   }
