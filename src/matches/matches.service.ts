@@ -41,7 +41,8 @@ export class MatchesService {
       const hour = Number(timeParts[0]);
       const minute = Number(timeParts[1]);
       
-      return new Date(Date.UTC(year, month, day, hour, minute));
+      //return new Date(Date.UTC(year, month, day, hour, minute));
+      return new Date(year, month, day, hour, minute);
     } catch {
       return new Date(dateStr);
     }
