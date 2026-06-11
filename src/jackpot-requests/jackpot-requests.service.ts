@@ -127,43 +127,17 @@ export class JackpotRequestsService {
       throw new BadRequestException('El jackpot de este partido ya ha sido procesado');
     }
 
-    // 1. Get all approved requests for fromMatch
-    const approvedRequests = await this.jackpotRequestModel.find({
-      matchId: fromMatch._id,
-      status: 'approved',
-    }).exec();
-
-    // 2. Transfer pot
+    // 1. Transfer pot
     const rolloverAmount = fromMatch.jackpotPot || 0;
     await this.matchesService.incrementJackpotPot(toMatchId, rolloverAmount);
 
-    // Reset fromMatch pot to 0 and set jackpotStatus to 'rolled_over'
+    // 2. Reset fromMatch pot to 0 and set jackpotStatus to 'rolled_over'
     await this.matchesService.update(fromMatchId, {
       jackpotPot: 0,
       jackpotStatus: 'rolled_over',
     });
 
-    // 3. Register users automatically in toMatch for free
-    for (const req of approvedRequests) {
-      const existing = await this.jackpotRequestModel.findOne({
-        userId: req.userId,
-        matchId: toMatch._id,
-      }).exec();
-
-      if (!existing) {
-        const newReq = new this.jackpotRequestModel({
-          userId: req.userId,
-          matchId: toMatch._id,
-          status: 'approved',
-        });
-        await newReq.save();
-      } else if (existing.status !== 'approved') {
-        existing.status = 'approved';
-        await existing.save();
-      }
-    }
-
-    return { success: true, rolledOverAmount: rolloverAmount, usersTransferred: approvedRequests.length };
+    return { success: true, rolledOverAmount: rolloverAmount, usersTransferred: 0 };
   }
 
   async payoutJackpot(matchId: string): Promise<any> {
