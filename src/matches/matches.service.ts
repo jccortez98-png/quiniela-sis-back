@@ -66,14 +66,36 @@ export class MatchesService {
   }
 
   async update(id: string, updateData: any): Promise<MatchDocument> {
+    const match = await this.matchModel.findById(id).exec();
+    if (!match) {
+      throw new NotFoundException('Partido no encontrado');
+    }
+
+    const wasFinished = match.status === 'finished';
+    const oldScore = match.actualScore;
+
     const updated = await this.matchModel.findByIdAndUpdate(
       id,
       { $set: updateData },
       { new: true },
     ).exec();
+
     if (!updated) {
       throw new NotFoundException('Partido no encontrado');
     }
+
+    // Trigger point calculations if status is set to finished (or if finished and score changed)
+    const isNowFinished = updated.status === 'finished';
+    const actualScore = updated.actualScore;
+
+    const scoreChanged = !oldScore || !actualScore || 
+      oldScore.home !== actualScore.home || 
+      oldScore.away !== actualScore.away;
+
+    if (isNowFinished && (!wasFinished || scoreChanged) && actualScore) {
+      await this.predictionsService.scoreMatchPredictions(id, actualScore);
+    }
+
     return updated;
   }
 
