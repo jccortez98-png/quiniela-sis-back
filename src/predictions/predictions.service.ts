@@ -317,4 +317,32 @@ export class PredictionsService {
 
     return predictions.map(p => p.userId);
   }
+
+  async findMatchPredictions(matchId: string, type: 'general' | 'jackpot'): Promise<any[]> {
+    const match = await this.matchesService.findById(matchId);
+    if (!match) {
+      throw new NotFoundException('Partido no encontrado');
+    }
+
+    // Security: Only reveal predictions after the 10-minute lock or if already started/live/finished
+    const now = new Date();
+    const lockTime = new Date(match.date.getTime() - 10 * 60 * 1000);
+    if (now < lockTime && match.status === 'pending') {
+      throw new BadRequestException('Las predicciones de otros usuarios se revelarán cuando el partido comience o esté bloqueado (10 minutos antes).');
+    }
+
+    const predictions = await this.predictionModel.find({
+      matchId: new Types.ObjectId(matchId),
+      type,
+    })
+    .populate('userId', 'nickname realName avatarUrl')
+    .exec();
+
+    // Sort alphabetically by user nickname
+    return predictions.sort((a: any, b: any) => {
+      const nickA = (a.userId?.nickname || '').toLowerCase();
+      const nickB = (b.userId?.nickname || '').toLowerCase();
+      return nickA.localeCompare(nickB);
+    });
+  }
 }
