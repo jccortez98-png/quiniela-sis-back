@@ -338,8 +338,16 @@ export class PredictionsService {
     .populate('userId', 'nickname realName avatarUrl')
     .exec();
 
-    // Sort alphabetically by user nickname
+    // Sort: if match finished, sort by pointsEarned descending, then by nickname.
+    // Otherwise, sort alphabetically by nickname.
     return predictions.sort((a: any, b: any) => {
+      if (match.status === 'finished') {
+        const pointsA = a.pointsEarned || 0;
+        const pointsB = b.pointsEarned || 0;
+        if (pointsB !== pointsA) {
+          return pointsB - pointsA;
+        }
+      }
       const nickA = (a.userId?.nickname || '').toLowerCase();
       const nickB = (b.userId?.nickname || '').toLowerCase();
       return nickA.localeCompare(nickB);
