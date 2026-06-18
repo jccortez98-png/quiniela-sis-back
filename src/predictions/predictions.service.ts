@@ -75,126 +75,13 @@ export class PredictionsService {
   }
 
   async ensureDefaultPredictionsForUser(userId: string): Promise<void> {
-    const user = await this.usersService.findById(userId);
-    if (!user) return;
-
-    const matches = await this.matchesService.findAll();
-    const now = new Date();
-
-    const lockedMatches = matches.filter(m => {
-      const lockTime = new Date(m.date.getTime() - 10 * 60 * 1000);
-      return now >= lockTime;
-    });
-
-    if (lockedMatches.length === 0) return;
-
-    // Get all predictions for this user to check existing
-    const existingPredictions = await this.predictionModel.find({
-      userId: new Types.ObjectId(userId)
-    }).exec();
-
-    // Check General predictions
-    if (user.isEnrolledGeneral) {
-      for (const match of lockedMatches) {
-        const hasGeneral = existingPredictions.some(
-          p => p.matchId.toString() === match._id.toString() && p.type === 'general'
-        );
-        if (!hasGeneral) {
-          try {
-            await new this.predictionModel({
-              userId: new Types.ObjectId(userId),
-              matchId: match._id,
-              type: 'general',
-              predictedScore: { home: 0, away: 0 },
-              pointsEarned: 0
-            }).save();
-          } catch (e) {
-            // Ignore duplicate/concurrent insert errors
-          }
-        }
-      }
-    }
-
-    // Check Jackpot predictions
-    const jackpotReqs = await this.jackpotRequestsService.findByUser(userId);
-    const approvedMatchIds = jackpotReqs
-      .filter(r => r.status === 'approved')
-      .map(r => r.matchId.toString());
-
-    for (const match of lockedMatches) {
-      if (approvedMatchIds.includes(match._id.toString())) {
-        const hasJackpot = existingPredictions.some(
-          p => p.matchId.toString() === match._id.toString() && p.type === 'jackpot'
-        );
-        if (!hasJackpot) {
-          try {
-            await new this.predictionModel({
-              userId: new Types.ObjectId(userId),
-              matchId: match._id,
-              type: 'jackpot',
-              predictedScore: { home: 0, away: 0 },
-              pointsEarned: 0
-            }).save();
-          } catch (e) {
-            // Ignore duplicate/concurrent insert errors
-          }
-        }
-      }
-    }
+    // Disabled: Do not auto-generate default 0-0 predictions
+    return;
   }
 
   async ensureDefaultPredictionsForMatch(matchId: string): Promise<void> {
-    const match = await this.matchesService.findById(matchId);
-    if (!match) return;
-
-    // Get all predictions for this match
-    const existingPredictions = await this.predictionModel.find({
-      matchId: new Types.ObjectId(matchId)
-    }).exec();
-
-    // 1. For General: get all general enrolled users
-    const allUsers = await this.usersService.findAll();
-    const generalUsers = allUsers.filter(u => u.isEnrolledGeneral);
-
-    for (const user of generalUsers) {
-      const hasGeneral = existingPredictions.some(
-        p => p.userId.toString() === user._id.toString() && p.type === 'general'
-      );
-      if (!hasGeneral) {
-        try {
-          await new this.predictionModel({
-            userId: user._id,
-            matchId: match._id,
-            type: 'general',
-            predictedScore: { home: 0, away: 0 },
-            pointsEarned: 0
-          }).save();
-        } catch (e) {
-          // Ignore
-        }
-      }
-    }
-
-    // 2. For Jackpot: get all approved jackpot requests for this match
-    const approvedRequests = await this.jackpotRequestsService.findApprovedByMatch(matchId);
-    for (const req of approvedRequests) {
-      const hasJackpot = existingPredictions.some(
-        p => p.userId.toString() === req.userId.toString() && p.type === 'jackpot'
-      );
-      if (!hasJackpot) {
-        try {
-          await new this.predictionModel({
-            userId: req.userId,
-            matchId: match._id,
-            type: 'jackpot',
-            predictedScore: { home: 0, away: 0 },
-            pointsEarned: 0
-          }).save();
-        } catch (e) {
-          // Ignore
-        }
-      }
-    }
+    // Disabled: Do not auto-generate default 0-0 predictions
+    return;
   }
 
   async findByUser(userId: string): Promise<PredictionDocument[]> {
