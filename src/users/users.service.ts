@@ -171,6 +171,6 @@ export class UsersService {
   }
 
   async findAll(): Promise<UserDocument[]> {
-    return this.userModel.find().select('-password').exec();
+    return this.userModel.find().select('-password').populate('favoriteTeams').exec();
   }
 }
